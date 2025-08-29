@@ -1,0 +1,235 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users model
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  password_hash String
+  phone        String?
+  role         UserRole   @default(CLIENT)
+  created_at   DateTime   @default(now())
+  
+  // Relations
+  orders       Order[]
+  cart         Cart?
+  blog_posts   BlogPost[]
+  feedback     Feedback[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  CLIENT
+  ADMIN
+  MANAGER
+}
+
+// Categories model
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  parent_id   String?    // Self-relation for nested categories
+  parent      Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
+  children    Category[] @relation("CategoryToCategory")
+  products    Product[]
+
+  @@map("categories")
+}
+
+// Products model
+model Product {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int
+  image_url   String?
+  category_id String
+  created_at  DateTime     @default(now())
+  
+  // Relations
+  category    Category     @relation(fields: [category_id], references: [id])
+  order_items OrderItem[]
+  cart_items  CartItem[]
+  feedback    Feedback[]
+
+  @@map("products")
+}
+
+// Orders model
+model Order {
+  id          String      @id @default(uuid())
+  user_id     String
+  status      OrderStatus @default(NEW)
+  total_price Float
+  created_at  DateTime    @default(now())
+  
+  // Relations
+  user        User        @relation(fields: [user_id], references: [id])
+  items       OrderItem[]
+  payment     Payment?
+  delivery    Delivery?
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  NEW
+  PROCESSING
+  COMPLETED
+  CANCELED
+}
+
+// Order Items model
+model OrderItem {
+  id         String  @id @default(uuid())
+  order_id   String
+  product_id String
+  quantity   Int
+  price      Float
+  
+  // Relations
+  order      Order   @relation(fields: [order_id], references: [id])
+  product    Product @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+// Cart model
+model Cart {
+  id         String     @id @default(uuid())
+  user_id    String     @unique
+  created_at DateTime   @default(now())
+  
+  // Relations
+  user       User       @relation(fields: [user_id], references: [id])
+  items      CartItem[]
+
+  @@map("carts")
+}
+
+// Cart Items model
+model CartItem {
+  id         String  @id @default(uuid())
+  cart_id    String
+  product_id String
+  quantity   Int
+  
+  // Relations
+  cart       Cart    @relation(fields: [cart_id], references: [id])
+  product    Product @relation(fields: [product_id], references: [id])
+
+  @@map("cart_items")
+}
+
+// Blog Posts model
+model BlogPost {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  image_url  String?
+  author_id  String
+  created_at DateTime @default(now())
+  
+  // Relations
+  author     User     @relation(fields: [author_id], references: [id])
+
+  @@map("blog_posts")
+}
+
+// Feedback model
+model Feedback {
+  id         String   @id @default(uuid())
+  user_id    String
+  product_id String
+  rating     Int      @default(5)
+  comment    String?
+  created_at DateTime @default(now())
+  
+  // Relations
+  user       User     @relation(fields: [user_id], references: [id])
+  product    Product  @relation(fields: [product_id], references: [id])
+
+  @@map("feedback")
+}
+
+// Payment model
+model Payment {
+  id         String        @id @default(uuid())
+  order_id   String       @unique
+  method     PaymentMethod
+  status     PaymentStatus @default(PENDING)
+  
+  // Relations
+  order      Order         @relation(fields: [order_id], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CARD
+  CASH
+  TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// Delivery model
+model Delivery {
+  id         String         @id @default(uuid())
+  order_id   String        @unique
+  address    String
+  status     DeliveryStatus @default(PENDING)
+  
+  // Relations
+  order      Order          @relation(fields: [order_id], references: [id])
+
+  @@map("deliveries")
+}
+
+enum DeliveryStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+// Settings model
+model Setting {
+  id              Int      @id @default(autoincrement())
+  login_admin     String?  // Логин для админ-панели
+  password_admin  String?  // Пароль для админ-панели
+  telegram_key    String?  // Токен Telegram бота
+  chat_id         String?  // Chat ID для отправки сообщений в Telegram
+  is_secure      Boolean  @default(true)  // Все настройки по умолчанию секретные
+  description    String?  // Описание настройки
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// 2FA Sessions model
+model TwoFactorSession {
+  id          String   @id @default(cuid())
+  phone       String
+  code        String
+  expires_at  DateTime
+  created_at  DateTime @default(now())
+
+  @@map("two_factor_sessions")
+}
