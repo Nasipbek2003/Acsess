@@ -38,12 +38,19 @@ model Category {
   id          String     @id @default(uuid())
   name        String
   description String?
+  type        CategoryType @default(CATALOG) // Тип категории
   parent_id   String?    // Self-relation for nested categories
   parent      Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
   children    Category[] @relation("CategoryToCategory")
   products    Product[]
 
   @@map("categories")
+}
+
+enum CategoryType {
+  CATALOG      // Каталог
+  TARGET_GROUP // Для кого
+  PURPOSE      // По назначению
 }
 
 // Products model
@@ -232,4 +239,16 @@ model TwoFactorSession {
   created_at  DateTime @default(now())
 
   @@map("two_factor_sessions")
+}
+
+// Notifications model
+model Notification {
+  id         String   @id @default(cuid())
+  title      String
+  message    String
+  type       String   // 'success' | 'error' | 'info' | 'warning'
+  read       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@map("notifications")
 }

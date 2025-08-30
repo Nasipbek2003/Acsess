@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import ThemeToggle from '../ThemeToggle'
+import Notifications from './Notifications'
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -40,12 +41,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
               <ThemeToggle />
 
               {/* Notifications */}
-              <button className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all duration-200">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-4-4V8a6 6 0 10-12 0v5l-4 4h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-              </button>
+              <Notifications />
 
               {/* User menu */}
               <div className="relative">

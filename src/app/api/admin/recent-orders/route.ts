@@ -5,8 +5,10 @@ const prisma = new PrismaClient()
 
 export async function GET() {
   try {
-    // Получаем последние 5 заказов с информацией о пользователе
-    const recentOrders = await prisma.order.findMany({
+    console.log('🔍 Fetching recent orders...')
+    
+    // Получаем последние 5 заказов
+    const orders = await prisma.order.findMany({
       take: 5,
       orderBy: {
         created_at: 'desc'
@@ -14,16 +16,19 @@ export async function GET() {
       include: {
         user: {
           select: {
-            name: true
+            name: true,
+            email: true
           }
         }
       }
     })
 
-    return NextResponse.json(recentOrders)
+    console.log(`✅ Found ${orders.length} recent orders`)
+
+    return NextResponse.json(orders)
 
   } catch (error) {
-    console.error('Ошибка получения последних заказов:', error)
+    console.error('❌ Error fetching recent orders:', error)
     return NextResponse.json(
       { error: 'Ошибка получения последних заказов' },
       { status: 500 }
@@ -32,4 +37,3 @@ export async function GET() {
     await prisma.$disconnect()
   }
 }
-

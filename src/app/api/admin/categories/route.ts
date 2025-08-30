@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { withAuth } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
-export async function GET() {
+// GET не требует авторизации
+export async function GET(request: Request) {
   try {
-    // Получаем все категории
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type') // CATALOG, TARGET_GROUP, PURPOSE
+
+    // Получаем категории по типу или все
+    const where = type ? { type: type as any } : {}
+    
     const categories = await prisma.category.findMany({
+      where,
       select: {
         id: true,
         name: true,
-        description: true
+        description: true,
+        type: true
       },
       orderBy: {
         name: 'asc'
@@ -30,10 +39,11 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+// POST требует авторизации
+export const POST = withAuth(async (request: Request) => {
   try {
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, type = 'CATALOG' } = body
 
     if (!name) {
       return NextResponse.json(
@@ -46,7 +56,8 @@ export async function POST(request: Request) {
     const category = await prisma.category.create({
       data: {
         name,
-        description: description || null
+        description: description || null,
+        type
       }
     })
 
@@ -61,5 +72,4 @@ export async function POST(request: Request) {
   } finally {
     await prisma.$disconnect()
   }
-}
-
+})

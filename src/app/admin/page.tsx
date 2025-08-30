@@ -49,21 +49,27 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         // Получаем статистику
-        const statsResponse = await fetch('/api/admin/stats')
+        const statsResponse = await fetch('/api/admin/stats', {
+          credentials: 'include'
+        })
         if (statsResponse.ok) {
           const statsData = await statsResponse.json()
           setStats(statsData)
         }
 
         // Получаем последние заказы
-        const ordersResponse = await fetch('/api/admin/recent-orders')
+        const ordersResponse = await fetch('/api/admin/recent-orders', {
+          credentials: 'include'
+        })
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json()
           setRecentOrders(ordersData)
         }
 
         // Получаем популярные товары
-        const productsResponse = await fetch('/api/admin/popular-products')
+        const productsResponse = await fetch('/api/admin/popular-products', {
+          credentials: 'include'
+        })
         if (productsResponse.ok) {
           const productsData = await productsResponse.json()
           setPopularProducts(productsData)

@@ -1,12 +1,11 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // S3 Configuration
 const S3_CONFIG = {
   accessKeyId: process.env.S3_ACCESS_KEY_ID || 'VILL7AAOSUBNG1GCY61U',
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || 'w0qQH4DDAq5pTpIgtCcZ1xbA9kTcZzS9br9nDICM',
   endpoint: process.env.S3_ENDPOINT || 'https://s3.twcstorage.ru',
-  region: process.env.S3_REGION || 'us-east-1',
+  region: process.env.S3_REGION || 'auto',
   bucketName: process.env.S3_BUCKET_NAME || 'acsess-products'
 };
 
@@ -34,16 +33,29 @@ export async function uploadToS3(
     Key: key,
     Body: file,
     ContentType: contentType,
-    ACL: 'public-read', // Make files publicly accessible
   });
 
   try {
-    await s3Client.send(command);
+    console.log('Uploading to S3 with config:', {
+      bucket: S3_CONFIG.bucketName,
+      key,
+      endpoint: S3_CONFIG.endpoint
+    });
+    
+    const result = await s3Client.send(command);
+    console.log('S3 upload result:', result);
+    
     // Return the public URL
     return `${S3_CONFIG.endpoint}/${S3_CONFIG.bucketName}/${key}`;
   } catch (error) {
     console.error('Error uploading to S3:', error);
-    throw new Error('Failed to upload file to S3');
+    console.error('S3 Config used:', {
+      endpoint: S3_CONFIG.endpoint,
+      region: S3_CONFIG.region,
+      bucket: S3_CONFIG.bucketName,
+      accessKeyId: S3_CONFIG.accessKeyId ? 'Set' : 'Not set'
+    });
+    throw new Error(`Failed to upload file to S3: ${error}`);
   }
 }
 
@@ -63,25 +75,5 @@ export async function deleteFromS3(fileUrl: string): Promise<void> {
   } catch (error) {
     console.error('Error deleting from S3:', error);
     throw new Error('Failed to delete file from S3');
-  }
-}
-
-// Generate presigned URL for secure uploads
-export async function generatePresignedUrl(fileName: string, contentType: string): Promise<string> {
-  const key = `products/${Date.now()}-${fileName}`;
-  
-  const command = new PutObjectCommand({
-    Bucket: S3_CONFIG.bucketName,
-    Key: key,
-    ContentType: contentType,
-    ACL: 'public-read',
-  });
-
-  try {
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour
-    return signedUrl;
-  } catch (error) {
-    console.error('Error generating presigned URL:', error);
-    throw new Error('Failed to generate presigned URL');
   }
 }

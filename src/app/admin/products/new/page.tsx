@@ -8,12 +8,15 @@ interface Category {
   id: string
   name: string
   description?: string
+  type: 'CATALOG' | 'TARGET_GROUP' | 'PURPOSE'
 }
 
 export default function AddProductPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [catalogCategories, setCatalogCategories] = useState<Category[]>([])
+  const [targetGroups, setTargetGroups] = useState<Category[]>([])
+  const [purposes, setPurposes] = useState<Category[]>([])
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -30,10 +33,25 @@ export default function AddProductPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/admin/categories')
-        if (response.ok) {
-          const data = await response.json()
-          setCategories(data)
+        // Загружаем каталог
+        const catalogResponse = await fetch('/api/admin/categories?type=CATALOG')
+        if (catalogResponse.ok) {
+          const catalogData = await catalogResponse.json()
+          setCatalogCategories(catalogData)
+        }
+
+        // Загружаем целевые группы
+        const targetResponse = await fetch('/api/admin/categories?type=TARGET_GROUP')
+        if (targetResponse.ok) {
+          const targetData = await targetResponse.json()
+          setTargetGroups(targetData)
+        }
+
+        // Загружаем назначения
+        const purposeResponse = await fetch('/api/admin/categories?type=PURPOSE')
+        if (purposeResponse.ok) {
+          const purposeData = await purposeResponse.json()
+          setPurposes(purposeData)
         }
       } catch (error) {
         console.error('Ошибка загрузки категорий:', error)
@@ -104,10 +122,20 @@ export default function AddProductPage() {
       // Сначала загружаем изображение, если оно выбрано
       let imageUrl = formData.image_url
       if (selectedFile) {
-        const uploadedUrl = await uploadImage()
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl
+        const uploadedImageUrl = await uploadImage()
+        if (uploadedImageUrl) {
+          imageUrl = uploadedImageUrl
+        } else {
+          throw new Error('Не удалось загрузить изображение')
         }
+      }
+
+      // Отправляем данные товара
+      const productData = {
+        ...formData,
+        image_url: imageUrl,
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock)
       }
 
       const response = await fetch('/api/admin/products', {
@@ -115,35 +143,39 @@ export default function AddProductPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          image_url: imageUrl,
-          price: parseFloat(formData.price),
-          stock: parseInt(formData.stock)
-        }),
+        credentials: 'include', // Включаем куки с токеном
+        body: JSON.stringify(productData),
       })
 
       if (response.ok) {
-        // Успешно добавлен товар
         alert('Товар успешно добавлен!')
         router.push('/admin/products')
       } else {
         const error = await response.json()
-        alert('Ошибка: ' + error.error)
+        throw new Error(error.error)
       }
     } catch (error) {
       console.error('Ошибка добавления товара:', error)
-      alert('Ошибка добавления товара')
+      alert('Ошибка: ' + error)
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <AdminLayout title="Добавить товар">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 transition-colors duration-300">
-          <form onSubmit={handleSubmit} className="space-y-6">
+    <AdminLayout>
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Добавить новый товар
+          </h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Заполните информацию о товаре
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Название товара */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -153,10 +185,10 @@ export default function AddProductPage() {
                 type="text"
                 id="name"
                 name="name"
-                required
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+                required
+                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Введите название товара"
               />
             </div>
@@ -169,34 +201,57 @@ export default function AddProductPage() {
               <textarea
                 id="description"
                 name="description"
-                rows={4}
                 value={formData.description}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+                rows={4}
+                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Введите описание товара"
               />
             </div>
 
-            {/* Цена и Количество */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Основная категория */}
+            <div>
+              <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Каталог *
+              </label>
+              <select
+                id="category_id"
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleInputChange}
+                required
+                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">Выберите категорию</option>
+                {catalogCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Дополнительные поля пока скрыты - будут добавлены после миграции базы данных */}
+
+            {/* Цена и количество */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Цена (₽) *
+                  Цена *
                 </label>
                 <input
                   type="number"
                   id="price"
                   name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
                   required
                   min="0"
                   step="0.01"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   placeholder="0.00"
                 />
               </div>
-
               <div>
                 <label htmlFor="stock" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Количество на складе *
@@ -205,36 +260,14 @@ export default function AddProductPage() {
                   type="number"
                   id="stock"
                   name="stock"
-                  required
-                  min="0"
                   value={formData.stock}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
+                  required
+                  min="0"
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   placeholder="0"
                 />
               </div>
-            </div>
-
-            {/* Категория */}
-            <div>
-              <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Категория *
-              </label>
-              <select
-                id="category_id"
-                name="category_id"
-                required
-                value={formData.category_id}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-              >
-                <option value="">Выберите категорию</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Загрузка изображения */}
@@ -242,72 +275,83 @@ export default function AddProductPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Изображение товара
               </label>
-              
-              {/* Выбор файла */}
-              <div className="mb-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-                />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Поддерживаемые форматы: JPEG, PNG, WebP, AVIF (макс. 5MB)
-                </p>
-              </div>
-
-              {/* Превью изображения */}
-              {previewImage && (
-                <div className="mb-4">
-                  <div className="relative w-32 h-32 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-                    <img
-                      src={previewImage}
-                      alt="Превью"
-                      className="w-full h-full object-cover"
-                    />
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md">
+                <div className="space-y-1 text-center">
+                  {previewImage ? (
+                    <div className="mb-4">
+                      <img src={previewImage} alt="Preview" className="mx-auto h-32 w-32 object-cover rounded-md" />
+                    </div>
+                  ) : (
+                    <svg
+                      className="mx-auto h-12 w-12 text-gray-400"
+                      stroke="currentColor"
+                      fill="none"
+                      viewBox="0 0 48 48"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                    <label
+                      htmlFor="file-upload"
+                      className="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                    >
+                      <span>Загрузить файл</span>
+                      <input
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        className="sr-only"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+                    <p className="pl-1">или перетащите сюда</p>
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    PNG, JPG, GIF до 10MB
+                  </p>
                 </div>
-              )}
-
-              {/* Альтернативно: URL изображения */}
-              <div className="mt-4">
-                <label htmlFor="image_url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Или введите URL изображения
-                </label>
-                <input
-                  type="url"
-                  id="image_url"
-                  name="image_url"
-                  value={formData.image_url}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200"
-                  placeholder="https://example.com/image.jpg"
-                />
               </div>
             </div>
 
-            {/* Кнопки */}
-            <div className="flex items-center justify-between pt-6">
+            {/* URL изображения (альтернативный способ) */}
+            <div>
+              <label htmlFor="image_url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Или введите URL изображения
+              </label>
+              <input
+                type="url"
+                id="image_url"
+                name="image_url"
+                value={formData.image_url}
+                onChange={handleInputChange}
+                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+
+            {/* Кнопка отправки */}
+            <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => router.push('/admin/products')}
-                className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg transition-all duration-200"
+                onClick={() => router.back()}
+                className="mr-3 inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Отмена
               </button>
-              
               <button
                 type="submit"
                 disabled={isLoading || uploadingImage}
-                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-all duration-200 flex items-center"
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(isLoading || uploadingImage) && (
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                )}
-                {uploadingImage ? 'Загрузка изображения...' : isLoading ? 'Добавление...' : 'Добавить товар'}
+                {isLoading ? 'Добавление...' : uploadingImage ? 'Загрузка изображения...' : 'Добавить товар'}
               </button>
             </div>
           </form>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx'
 
 interface Product {
   id: string
@@ -22,12 +24,88 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+
+  // Функции для работы с товарами
+  const handleEdit = (id: string) => {
+    router.push(`/admin/products/edit/${id}`)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот товар?')) return
+
+    try {
+      const response = await fetch(`/api/admin/products/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setProducts(products.filter(p => p.id !== id))
+      } else {
+        alert('Ошибка при удалении товара')
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении:', error)
+      alert('Ошибка при удалении товара')
+    }
+  }
+
+  // Функции для импорта/экспорта
+  const handleImport = async () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.xlsx,.xls'
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      try {
+        const data = await file.arrayBuffer()
+        const workbook = XLSX.read(data)
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+        const response = await fetch('/api/admin/products/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ products: jsonData }),
+        })
+
+        if (response.ok) {
+          alert('Импорт успешно завершен')
+          window.location.reload()
+        } else {
+          alert('Ошибка при импорте')
+        }
+      } catch (error) {
+        console.error('Ошибка при импорте:', error)
+        alert('Ошибка при импорте файла')
+      }
+    }
+
+    input.click()
+  }
+
+  const handleExport = () => {
+    const exportData = products.map(({ id, created_at, ...product }) => ({
+      ...product,
+      category: product.category.name
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products')
+    XLSX.writeFile(workbook, 'products.xlsx')
+  }
 
   // Загружаем товары при загрузке страницы
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('/api/admin/products')
+        const response = await fetch('/api/admin/products', {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           setProducts(data)
@@ -103,11 +181,23 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-          <button className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200">
-            📥 Импорт
+          <button 
+            onClick={handleImport}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+            Импорт
           </button>
-          <button className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200">
-            📤 Экспорт
+          <button 
+            onClick={handleExport}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Экспорт
           </button>
           <Link
             href="/admin/products/new"
@@ -188,15 +278,24 @@ export default function ProductsPage() {
                     {getStatusBadge(product.stock)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button className="text-indigo-600 hover:text-indigo-900 transition-colors">
-                        ✏️
+                    <div className="flex items-center justify-end space-x-3">
+                      <button 
+                        onClick={() => handleEdit(product.id)}
+                        className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        title="Редактировать товар"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                        </svg>
                       </button>
-                      <button className="text-gray-600 hover:text-gray-900 transition-colors">
-                        👁️
-                      </button>
-                      <button className="text-red-600 hover:text-red-900 transition-colors">
-                        🗑️
+                      <button 
+                        onClick={() => handleDelete(product.id)}
+                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                        title="Удалить товар"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
                       </button>
                     </div>
                   </td>

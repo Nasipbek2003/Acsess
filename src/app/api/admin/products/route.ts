@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { withAuth } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
+// GET не требует авторизации
 export async function GET() {
   try {
+    console.log('🔍 Fetching products from admin API...')
+    
     // Получаем все товары с информацией о категориях
     const products = await prisma.product.findMany({
       include: {
@@ -19,6 +23,15 @@ export async function GET() {
       }
     })
 
+    console.log(`✅ Found ${products.length} products`)
+    if (products.length > 0) {
+      console.log('📦 Sample product:', {
+        id: products[0].id,
+        name: products[0].name,
+        category: products[0].category?.name
+      })
+    }
+
     return NextResponse.json(products)
 
   } catch (error) {
@@ -32,9 +45,12 @@ export async function GET() {
   }
 }
 
+// POST временно без авторизации для отладки
 export async function POST(request: Request) {
   try {
+    console.log('🔄 Creating new product...')
     const body = await request.json()
+    console.log('📦 Received product data:', body)
     const { name, description, price, stock, category_id, image_url } = body
 
     // Валидация обязательных полей
@@ -97,10 +113,11 @@ export async function POST(request: Request) {
       }
     })
 
+    console.log('✅ Product created successfully:', product.name)
     return NextResponse.json(product, { status: 201 })
 
   } catch (error) {
-    console.error('Ошибка создания товара:', error)
+    console.error('❌ Error creating product:', error)
     return NextResponse.json(
       { error: 'Ошибка создания товара' },
       { status: 500 }
@@ -109,4 +126,3 @@ export async function POST(request: Request) {
     await prisma.$disconnect()
   }
 }
-

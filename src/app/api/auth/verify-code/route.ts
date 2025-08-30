@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { sign } from 'jsonwebtoken'
+import { SignJWT } from 'jose'
+import { JWT_SECRET } from '@/lib/constants'
 
 const prisma = new PrismaClient()
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key'
 
 export async function POST(request: Request) {
   try {
@@ -56,30 +56,35 @@ export async function POST(request: Request) {
     })
 
     // Создаем JWT токен
-    const token = sign(
-      { 
-        authorized: true, 
-        phone: session.phone,
-        timestamp: Date.now()
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    )
+    const encoder = new TextEncoder()
+    const token = await new SignJWT({ 
+      authorized: true,
+      phone: session.phone,
+      timestamp: Date.now()
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(encoder.encode(JWT_SECRET))
 
-    // Создаем ответ с установкой куки
+    console.log('Generated token:', token)
+
+    // Создаем ответ
     const response = NextResponse.json({
       success: true,
       message: 'Аутентификация успешна'
     })
 
-    // Устанавливаем HTTP-only куку с токеном
+    // Устанавливаем куки
     response.cookies.set('admin-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 24 часа
       path: '/'
     })
+
+    console.log('Set cookie:', response.cookies.get('admin-token'))
 
     return response
 
@@ -89,5 +94,7 @@ export async function POST(request: Request) {
       { error: 'Внутренняя ошибка сервера' },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }

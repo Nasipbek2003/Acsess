@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { withAuth } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
+// Временно убираем авторизацию для отладки
 export async function GET() {
   try {
+    console.log('🔍 Fetching admin statistics...')
+    
     // Получаем общую статистику
     const [
       totalOrders,
@@ -56,14 +60,17 @@ export async function GET() {
       })
     ])
 
-    return NextResponse.json({
+    const statsResult = {
       orders: totalOrders,
       newOrders: newOrdersLastMonth,
       clients: totalClients,
       newClients: newClientsLastMonth,
       products: totalProducts,
       newProducts: newProductsLastMonth
-    })
+    }
+    
+    console.log('✅ Statistics result:', statsResult)
+    return NextResponse.json(statsResult)
 
   } catch (error) {
     console.error('Ошибка получения статистики:', error)
@@ -75,4 +82,3 @@ export async function GET() {
     await prisma.$disconnect()
   }
 }
-

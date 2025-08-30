@@ -99,13 +99,20 @@ export default function AdminLoginPage() {
       })
 
       const data = await response.json()
+      console.log('Verify code response:', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Ошибка проверки кода')
       }
 
-      // После успешной проверки кода перенаправляем на панель администратора
-      router.push('/admin')
+      if (data.success) {
+        // Добавляем небольшую задержку перед редиректом
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.push('/admin')
+        router.refresh()
+      } else {
+        throw new Error(data.error || 'Ошибка при проверке кода')
+      }
     } catch (error) {
       throw error
     }
