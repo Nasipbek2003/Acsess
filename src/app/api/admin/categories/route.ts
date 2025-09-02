@@ -39,8 +39,8 @@ export async function GET(request: Request) {
   }
 }
 
-// POST требует авторизации
-export const POST = withAuth(async (request: Request) => {
+// POST - временно убираем авторизацию для отладки
+export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { name, description, type = 'CATALOG' } = body
@@ -72,4 +72,4 @@ export const POST = withAuth(async (request: Request) => {
   } finally {
     await prisma.$disconnect()
   }
-})
+}

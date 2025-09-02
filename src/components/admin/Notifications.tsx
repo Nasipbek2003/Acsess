@@ -7,7 +7,7 @@ interface Notification {
   title: string
   message: string
   type: 'success' | 'error' | 'info' | 'warning'
-  createdAt: Date
+  created_at: Date | string
 }
 
 export default function Notifications() {
@@ -20,7 +20,10 @@ export default function Notifications() {
         const response = await fetch('/api/admin/notifications')
         if (response.ok) {
           const data = await response.json()
+          console.log('📢 Загружены уведомления:', data)
           setNotifications(data)
+        } else {
+          console.error('Ошибка загрузки уведомлений:', response.status, response.statusText)
         }
       } catch (error) {
         console.error('Ошибка при загрузке уведомлений:', error)
@@ -62,13 +65,25 @@ export default function Notifications() {
     }
   }
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(date))
+  const formatDate = (date: Date | string) => {
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date
+      
+      // Проверяем, что дата валидна
+      if (isNaN(dateObj.getTime())) {
+        return 'Недавно'
+      }
+      
+      return new Intl.DateTimeFormat('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(dateObj)
+    } catch (error) {
+      console.error('Ошибка форматирования даты:', error, date)
+      return 'Недавно'
+    }
   }
 
   const unreadCount = notifications.length
@@ -110,7 +125,7 @@ export default function Notifications() {
                         {notification.message}
                       </p>
                       <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                        {formatDate(notification.createdAt)}
+                        {formatDate(notification.created_at)}
                       </p>
                     </div>
                   </div>

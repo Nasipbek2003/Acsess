@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест изображений</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .product { margin: 20px; padding: 20px; border: 1px solid #ccc; border-radius: 10px; }
+        img { max-width: 400px; height: 200px; object-fit: cover; border-radius: 8px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Тест изображений товаров из базы данных</h1>
+    <div id="products"></div>
+
+    <script>
+        async function loadProducts() {
+            try {
+                const response = await fetch('http://localhost:3001/api/products/featured');
+                const products = await response.json();
+                
+                const container = document.getElementById('products');
+                
+                products.forEach(product => {
+                    const div = document.createElement('div');
+                    div.className = 'product';
+                    
+                    div.innerHTML = `
+                        <h3>${product.name}</h3>
+                        <p><strong>Категория:</strong> ${product.category}</p>
+                        <p><strong>Цена:</strong> ${product.price} ₽</p>
+                        <p><strong>URL изображения:</strong> ${product.image || 'Нет изображения'}</p>
+                        ${product.image ? `
+                            <img src="${product.image}" alt="${product.name}" 
+                                 onload="this.nextSibling.textContent = '✅ Изображение загружено'"
+                                 onerror="this.nextSibling.textContent = '❌ Ошибка загрузки изображения'">
+                            <p class="status">Загрузка...</p>
+                        ` : '<p class="error">Нет изображения</p>'}
+                    `;
+                    
+                    container.appendChild(div);
+                });
+                
+            } catch (error) {
+                document.getElementById('products').innerHTML = `<p class="error">Ошибка загрузки: ${error.message}</p>`;
+            }
+        }
+        
+        loadProducts();
+    </script>
+</body>
+</html>

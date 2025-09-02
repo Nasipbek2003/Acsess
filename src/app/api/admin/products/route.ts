@@ -28,7 +28,9 @@ export async function GET() {
       console.log('📦 Sample product:', {
         id: products[0].id,
         name: products[0].name,
-        category: products[0].category?.name
+        category: products[0].category?.name,
+        image_url: products[0].image_url,
+        description: products[0].description
       })
     }
 
